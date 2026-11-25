@@ -660,4 +660,8 @@ xcopy * "E:\private\github\example-projects\packages\funplay-cocos-mcp"  /e /h /
 ## 测试 是否是最新的 Streamable HTTP MCP
 curl -X POST http://127.0.0.1:27954/ -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -H "MCP-Protocol-Version: 2025-11-25" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"claude-code\",\"version\":\"0.1.0\"}}}"
 
+## Cocos Creator 3.8.8 迁移到 2.4.11
 
+- 选择节点、选择资源和清除选择使用 Creator 2.4.11 的 `Editor.Selection.select`、`Editor.Selection.clear`。
+- 读取当前选择使用 Creator 2.4.11 提供的 `Editor.Selection.curActivate('asset')` 和 `Editor.Selection.curActivate('node')`；仅选中一种对象时据此返回 `type`，同时选中或未选中时返回空字符串，避免猜测最后选中的类型。
+- 本次迁移仅调整选择信息读取和相应兼容测试；其他 Creator 3.8.8 API 的 2.4.11 兼容性需分别验证。

@@ -138,7 +138,7 @@ function summarizeNode(node, depth, maxDepth, includeComponents, includeInactive
     active: Boolean(node.active),
     layer: node.layer !== undefined ? node.layer : (node.group || node.groupIndex),
     position: vectorToObject(node.position),
-    rotation: quatToObject(node.rotation),
+    rotation: quatToObject(-node.angle),
     scale: vectorToObject(node.scale),
   };
 
