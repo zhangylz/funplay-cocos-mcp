@@ -666,3 +666,18 @@ curl -X POST http://127.0.0.1:27954/ -H "Content-Type: application/json" -H "Acc
 - 选择节点、选择资源和清除选择使用 Creator 2.4.11 的 `Editor.Selection.select`、`Editor.Selection.clear`。
 - 读取当前选择使用 Creator 2.4.11 提供的 `Editor.Selection.curActivate('asset')` 和 `Editor.Selection.curActivate('node')`；仅选中一种对象时据此返回 `type`，同时选中或未选中时返回空字符串，避免猜测最后选中的类型。
 - 本次迁移仅调整选择信息读取和相应兼容测试；其他 Creator 3.8.8 API 的 2.4.11 兼容性需分别验证。
+
+
+# AI 工具配置
+## 通过cc switch 
+https://github.com/farion1231/cc-switch/releases/tag/v4.0.40
+
+### 配置 Cluade Code 路由 ，因为 使用 vscode Cluade Code 插件
+点击 添加供应商 -> 填写在公司申请的账号 -> 上游格式 选择 "OpenAI Chat Completions(需开启路由)"
+
+模型映射 ，查看 账号可供选择的模型 填写即可
+
+目前对模型的能力不清楚， 选择  gpt-6.1-terra/gpt-6.1-sola
+
+## 如何在 cluade code 中使用 整个 mcp呢？
+在 cc switch 的 "MCP" 中 "添加 MCP", 选择 连接方式 HTTP， 写入 选择 Claude Code 即可。
