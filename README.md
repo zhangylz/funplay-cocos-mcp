@@ -656,6 +656,7 @@ MIT License. See [LICENSE](./LICENSE).
 
 ## 将 插件拷贝到 指定项目
 xcopy * "E:\private\github\example-projects\packages\funplay-cocos-mcp"  /e /h /r /y
+xcopy "E:\private\github\funplay-cocos-mcp" "C:\Users\Ylee\.CocosCreator\packages\funplay-cocos-mcp\" /e /h /r /y /i
 
 ## 测试 是否是最新的 Streamable HTTP MCP
 curl -X POST http://127.0.0.1:27954/ -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -H "MCP-Protocol-Version: 2025-11-25" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"claude-code\",\"version\":\"0.1.0\"}}}"
