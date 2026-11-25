@@ -107,7 +107,7 @@ test('Skills read errors remain visible instead of looking like a current instal
 });
 
 test('Project Skills panel and browser messages are registered', () => {
-  assert.equal(manifest.panels['project-skills'].main, 'panel/project-skills.js');
+  assert.equal(manifest['panel.project-skills'].main, 'panel/project-skills.js');
   assert.equal(
     manifest.contributions.menu.some((entry) => entry.message === 'open-project-skills'),
     true

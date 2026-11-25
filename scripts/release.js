@@ -25,8 +25,10 @@ const REQUIRED_REPO_FILES = [
   'LICENSE',
   'server.json',
   'bin/funplay-cocos-mcp.js',
+  'main.js',
   'browser.js',
   'scene.js',
+  'scene-script.js',
   'panel/index.js',
   'i18n/en.js',
   'i18n/zh.js',
@@ -45,8 +47,10 @@ const PACKAGE_INCLUDES = [
   'LICENSE',
   'server.json',
   'bin',
+  'main.js',
   'browser.js',
   'scene.js',
+  'scene-script.js',
   'panel',
   'i18n',
   'lib'
@@ -160,12 +164,24 @@ function checkRelease(options = {}) {
     errors.push('package.json name must be funplay-cocos-mcp.');
   }
 
-  if (!Number.isInteger(packageJson.package_version) || packageJson.package_version <= 0) {
+  if (packageJson.package_version !== undefined &&
+      (!Number.isInteger(packageJson.package_version) || packageJson.package_version <= 0)) {
     errors.push('package.json package_version must be a positive integer.');
   }
 
   if (!packageJson.main || !fs.existsSync(path.join(ROOT, packageJson.main))) {
     errors.push('package.json main must point to an existing file.');
+  }
+
+  const sceneScript = packageJson['scene-script'];
+  if (sceneScript) {
+    const sceneScriptPath = path.resolve(ROOT, sceneScript);
+    const relativeSceneScriptPath = path.relative(ROOT, sceneScriptPath).split(path.sep).join('/');
+    if (relativeSceneScriptPath.startsWith('../') || !fs.existsSync(sceneScriptPath)) {
+      errors.push('package.json scene-script must point to an existing file inside the package.');
+    } else if (!PACKAGE_INCLUDES.includes(relativeSceneScriptPath)) {
+      errors.push(`package.json scene-script must be included in PACKAGE_INCLUDES: ${relativeSceneScriptPath}`);
+    }
   }
 
   if (!packageJson.bin || packageJson.bin['funplay-cocos-mcp'] !== 'bin/funplay-cocos-mcp.js') {
@@ -344,7 +360,7 @@ function buildManifest(context, artifact) {
         sha256: artifact.zipSha256,
         sizeBytes: artifact.zipSize,
         fileCount: artifact.fileCount,
-        installDirectory: 'extensions/funplay-cocos-mcp',
+        installDirectory: 'packages/funplay-cocos-mcp',
         githubDownloadUrl: `${REPOSITORY_URL}/releases/download/${context.tag}/${artifact.zipName}`
       }
     },
@@ -367,7 +383,7 @@ This folder contains the generated release artifacts for Funplay MCP for Cocos $
 ## Install
 
 1. Unzip \`${zip.file}\`.
-2. Move the extracted \`${PACKAGE_DIR_NAME}\` folder into your Cocos project \`extensions/\` directory.
+2. Move the extracted \`${PACKAGE_DIR_NAME}\` folder into your Cocos Creator 2.4 project \`packages/\` directory.
 3. Restart Cocos Creator or reload extensions.
 4. Open \`Funplay > MCP Server\`.
 

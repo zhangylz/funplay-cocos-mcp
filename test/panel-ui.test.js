@@ -59,7 +59,13 @@ function noticeClock(t) {
 
 test('only the dashboard retains Recent Activity; Output and the standalone log window stay removed', (t) => {
   fixture(t);
-  assert.deepEqual(Object.keys(manifest.panels).sort(), ['default', 'project-skills', 'settings', 'tool-exposure']);
+  assert.deepEqual(
+    ['panel', 'panel.project-skills', 'panel.settings', 'panel.tool-exposure']
+      .filter((key) => manifest[key])
+      .sort(),
+    ['panel', 'panel.project-skills', 'panel.settings', 'panel.tool-exposure']
+  );
+  assert.equal(manifest.panels, undefined);
   assert.equal(manifest.contributions.messages['open-activity'], undefined);
   assert.equal(manifest.contributions.menu.some((entry) => entry.message === 'open-activity'), false);
   for (const mode of ['dashboard', 'tool-exposure', 'settings', 'project-skills']) {
@@ -77,6 +83,43 @@ test('only the dashboard retains Recent Activity; Output and the standalone log 
     assert.match(style, /\.result-array > li, \.execution-logs > li \{ list-style: decimal outside;/);
     if (mode !== 'dashboard') assert.match(template, /id="openDashboardBtn"/);
   }
+});
+
+test('Creator 2.4 panels expose methods at the panel root and register only present selectors', (t) => {
+  const previous = global.Editor;
+  global.Editor = { Panel: { extend: (definition) => definition } };
+  t.after(() => { global.Editor = previous; });
+
+  const panel = createPanel('dashboard');
+  assert.equal(panel.methods, undefined);
+  assert.equal(typeof panel.applyStaticTranslations, 'function');
+  assert.equal(typeof panel.bindEvents, 'function');
+  assert.ok(panel.$.statusPill);
+  assert.ok(panel.$.restartBtn);
+  assert.equal(panel.$.saveToolProfileBtn, undefined);
+  assert.equal(panel.$.categoryControls, undefined);
+});
+
+test('Creator 2.4 selector properties are adapted to the shared panel selector map', async (t) => {
+  const previous = global.Editor;
+  global.Editor = { Panel: { extend: (definition) => definition } };
+  t.after(() => { global.Editor = previous; });
+
+  const definition = createPanel('dashboard');
+  const boundElement = element();
+  const panel = {};
+  for (const [name, value] of Object.entries(definition)) {
+    if (typeof value === 'function') panel[name] = value;
+  }
+  panel.$clearActivityBtn = boundElement;
+  panel.bindEvents = function () {
+    assert.equal(this.$.clearActivityBtn, boundElement);
+  };
+  panel.refresh = async () => {};
+  panel.autoCheckUpdates = async () => {};
+
+  await definition.ready.call(panel);
+  assert.equal(panel.$.clearActivityBtn, boundElement);
 });
 
 test('Recent Activity renders result cards safely without runtime logs', (t) => {

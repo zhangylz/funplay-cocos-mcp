@@ -9,6 +9,20 @@ const PKG = 'funplay-cocos-mcp';
 const DICTIONARIES = { en: EN, zh: ZH };
 
 function request(message, ...args) {
+  if (!global.Editor || !Editor.Message || typeof Editor.Message.request !== 'function') {
+    if (global.Editor && Editor.Ipc && typeof Editor.Ipc.sendToMain === 'function') {
+      return new Promise((resolve, reject) => {
+        const payload = args.length === 1 ? args[0] : args;
+        Editor.Ipc.sendToMain(`${PKG}:${message}`, payload, (error, value) => {
+          if (error) {
+            reject(new Error(typeof error === 'string' ? error : (error.message || String(error))));
+          } else {
+            resolve(value);
+          }
+        });
+      });
+    }
+  }
   return Editor.Message.request(PKG, message, ...args);
 }
 
@@ -1136,12 +1150,14 @@ const SELECTORS = {
 };
 
 function createPanel(mode) {
-  return Editor.Panel.define({
-    template: templateForMode(mode) + noticeMarkup(),
+  const template = templateForMode(mode) + noticeMarkup();
+  const selectors = selectorsForTemplate(template);
+  const definition = {
+    template,
     style: STYLE,
-    $: SELECTORS,
-    methods: createMethods(mode),
+    $: selectors,
     ready() {
+      ensurePanelSelectorMap(this, selectors);
       this.mode = mode;
       this.state = null;
       this.skillDiffs = {};
@@ -1159,7 +1175,44 @@ function createPanel(mode) {
         .catch((error) => this.showNotice(this.t('errors.refresh_failed', { error: error.message }), 'error'));
     },
     close() { this.dismissNotice(); },
-  });
+  };
+
+  if (Editor.Panel && typeof Editor.Panel.define === 'function') {
+    definition.methods = createMethods(mode);
+    return Editor.Panel.define(definition);
+  }
+  if (Editor.Panel && typeof Editor.Panel.extend === 'function') {
+    Object.assign(definition, createMethods(mode));
+    return Editor.Panel.extend(definition);
+  }
+  throw new Error('No supported Cocos panel API is available.');
+}
+
+function ensurePanelSelectorMap(panel, selectors) {
+  const elements = panel.$ && typeof panel.$ === 'object' ? panel.$ : {};
+  for (const [name, selector] of Object.entries(selectors)) {
+    if (elements[name] !== undefined) {
+      continue;
+    }
+
+    const id = selector.slice(1);
+    const element = panel[`$${id}`]
+      || (panel.shadowRoot && typeof panel.shadowRoot.querySelector === 'function'
+        ? panel.shadowRoot.querySelector(selector)
+        : null);
+    elements[name] = element || null;
+  }
+  panel.$ = elements;
+}
+
+function selectorsForTemplate(template) {
+  const selectors = {};
+  for (const [name, selector] of Object.entries(SELECTORS)) {
+    if (selector[0] === '#' && template.includes(`id="${selector.slice(1)}"`)) {
+      selectors[name] = selector;
+    }
+  }
+  return selectors;
 }
 
 function createMethods(mode) {

@@ -50,6 +50,71 @@ const REPOSITORY_URL = 'https://github.com/FunplayAI/funplay-cocos-mcp';
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
+function installLegacyEditorRequest() {
+  if (!global.Editor) return;
+  if (!Editor.Message) Editor.Message = {};
+  if (typeof Editor.Message.request === 'function') return;
+
+  Editor.Message.request = function (channel, method) {
+    const args = Array.prototype.slice.call(arguments, 2);
+    return new Promise((resolve, reject) => {
+      const done = (error, value) => {
+        if (error) {
+          reject(error instanceof Error ? error : new Error(typeof error === 'string' ? error : String(error)));
+        } else {
+          resolve(value);
+        }
+      };
+
+      if (channel === 'scene' && Editor.Scene && typeof Editor.Scene.callSceneScript === 'function') {
+        Editor.Scene.callSceneScript(
+          manifest.name,
+          method,
+          args.length === 1 ? args[0] : args,
+          done
+        );
+        return;
+      }
+
+      if (channel === 'asset-db' && Editor.assetdb) {
+        const db = Editor.assetdb;
+        const direct = {
+          'query-asset-info': db.queryInfoByUuid || db.queryAssetInfo,
+          'query-asset-meta': db.queryMetaInfoByUuid || db.queryAssetMeta,
+          'query-asset-data': db.queryAssetData,
+          'query-uuid': db.queryUuid,
+          'query-url': db.queryUrl,
+          'refresh-asset': db.refresh,
+          'create-asset': db.create,
+          'save-asset': db.saveExists || db.save,
+        };
+        const fn = direct[method];
+        if (typeof fn === 'function') {
+          try {
+            const result = fn.apply(db, args.concat(done));
+            if (result && typeof result.then === 'function') result.then((value) => done(null, value)).catch(done);
+            else done(null, result);
+          } catch (error) {
+            done(error);
+          }
+        } else {
+          done(new Error(`Unsupported Cocos Creator 2.x AssetDB method: ${method}`));
+        }
+        return;
+      }
+
+      if (Editor.Ipc && typeof Editor.Ipc.sendToMain === 'function') {
+        Editor.Ipc.sendToMain(`${channel}:${method}`, args.length === 1 ? args[0] : args, done);
+        return;
+      }
+
+      done(new Error(`Editor IPC is unavailable for ${channel}:${method}`));
+    });
+  };
+}
+
+installLegacyEditorRequest();
+
 class ExtensionService {
   constructor() {
     this.config = null;
@@ -112,7 +177,7 @@ class ExtensionService {
     if (!global.Editor || !Editor.Panel || typeof Editor.Panel.open !== 'function') {
       throw new Error('Editor.Panel.open is unavailable in this Cocos extension host.');
     }
-    const normalized = String(panelName || 'default').trim();
+    const normalized = typeof panelName === 'string' ? panelName.trim() : 'default';
     const panelId = !normalized || normalized === 'default'
       ? EXTENSION_NAME
       : `${EXTENSION_NAME}.${normalized}`;

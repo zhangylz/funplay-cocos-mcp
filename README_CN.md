@@ -36,34 +36,34 @@ Funplay MCP for Cocos 是一个采用 MIT 协议的 Cocos Creator 扩展，它�
 
 如果你只想尽快连上，先做这三步：
 
-- 把这个仓库安装为 Cocos Creator 扩展
+- 把这个仓库安装为 Cocos Creator 插件包
 - 打开 `Funplay > MCP Server`
 - 使用内置的一键 MCP 客户端配置
 
 ### 1. 安装为 Cocos Creator 扩展
 
-推荐安装方式：通过官方 [Cocos Store 页面](https://store.cocos.com/app/detail/8913) 安装到目标 Cocos Creator 项目。
+Creator 2.4 请将插件包安装到项目的 `packages/` 目录。`extensions/` 是 Creator 3.x 使用的目录，不适用于 Creator 2.4。
 
 如果要本地开发或使用未发布版本，可以把仓库 clone 或复制到 Cocos 项目的扩展目录：
 
 ```bash
 cd /path/to/your-cocos-project
-mkdir -p extensions
-git clone https://github.com/FunplayAI/funplay-cocos-mcp.git extensions/funplay-cocos-mcp
+mkdir -p packages
+git clone https://github.com/FunplayAI/funplay-cocos-mcp.git packages/funplay-cocos-mcp
 ```
 
 然后重启 Cocos Creator，或在编辑器里重新加载扩展。
 
-如果不想用 git 安装，可以从 GitHub Releases 下载 `Funplay.CocosMcp.v<version>.zip`，解压后把 `funplay-cocos-mcp` 目录移动到项目的 `extensions/` 目录。
+如果不想用 git 安装，可以从 GitHub Releases 下载 `Funplay.CocosMcp.v<version>.zip`，解压后把 `funplay-cocos-mcp` 目录移动到项目的 `packages/` 目录。确认 `packages/funplay-cocos-mcp/scene-script.js`、`scene.js` 与 `package.json` 位于同一层。
 
 #### 为所有项目安装（推荐）
 
 先在任意一个项目中安装并打开扩展，然后进入 `Funplay > MCP Settings`，在“所有项目”区域点击 **为所有项目安装**。扩展会下载最新 GitHub Release、校验 `SHA256SUMS.txt`，再安装到当前 Cocos Creator 版本管理的全局扩展目录：
 
-- macOS / Linux：`~/.CocosCreator/builtin-extensions/<Creator 版本>/funplay-cocos-mcp`
-- Windows：`%USERPROFILE%\.CocosCreator\builtin-extensions\<Creator 版本>\funplay-cocos-mcp`
+- macOS / Linux：`~/.CocosCreator/packages/funplay-cocos-mcp`
+- Windows：`%USERPROFILE%\.CocosCreator\packages\funplay-cocos-mcp`
 
-安装完成后，扩展会让 Cocos Creator 立即扫描并注册这份全局副本。之后由同一 Creator 版本打开或新建的项目都会自动加载它，MCP Server 仍默认自动启动；如果当前已打开项目的项目副本优先，请重新打开项目。不会向每个项目的 `extensions/` 目录重复复制文件。
+安装完成后，重启 Cocos Creator 2.4.11 以加载全局插件包。项目内的插件包放在项目 `packages/` 目录。
 
 Cocos Creator 会按版本隔离全局扩展。如果同时使用多个 Creator 版本，需要在每个版本中分别执行一次“为所有项目安装”。
 

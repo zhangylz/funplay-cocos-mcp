@@ -1,36 +1,49 @@
 'use strict';
 
-module.paths.push(Editor.App.path + '/node_modules');
+if (
+  typeof Editor !== 'undefined' &&
+  Editor.App &&
+  typeof Editor.App.path === 'string' &&
+  Array.isArray(module.paths)
+) {
+  module.paths.push(Editor.App.path + '/node_modules');
+}
 
-const cc = require('cc');
+let cc;
+if (typeof global !== 'undefined' && global.cc) {
+  cc = global.cc;
+} else if (typeof globalThis !== 'undefined' && globalThis.cc) {
+  cc = globalThis.cc;
+} else {
+  cc = require('cc');
+}
 const { attachPrefabMetadata, normalizePrefabNodeLayers } = require('./lib/prefab-metadata');
 const { captureScriptExecution } = require('./lib/script-execution');
 
-const {
-  Node,
-  director,
-  Vec3,
-  Quat,
-  Color,
-  assetManager,
-  instantiate,
-  Prefab,
-  Scene,
-  SceneAsset,
-  js,
-  Component,
-  EventHandler,
-  Canvas,
-  UITransform,
-  Label,
-  Sprite,
-  Button,
-  Widget,
-  Camera,
-  Animation,
-  AnimationClip,
-} = cc;
-const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+const Node = cc.Node;
+const director = cc.director;
+const Vec3 = cc.Vec3;
+const Quat = cc.Quat;
+const Color = cc.Color;
+const assetManager = cc.assetManager;
+const instantiate = cc.instantiate;
+const Prefab = cc.Prefab;
+const Scene = cc.Scene;
+const SceneAsset = cc.SceneAsset;
+const js = cc.js;
+const Component = cc.Component || null;
+const EventHandler = (Component && Component.EventHandler) || null;
+const Canvas = cc.Canvas;
+const UITransform = cc.UITransformComponent || null;
+const Label = cc.Label;
+const Sprite = cc.Sprite;
+const Button = cc.Button;
+const Widget = cc.Widget;
+const Camera = cc.Camera;
+const Animation = cc.Animation;
+const AnimationClip = cc.AnimationClip;
+
+const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
 
 async function callPreviewRuntimeTool(name) {
   // Keep legacy scene-script entrypoints, but route them back to the editor's
@@ -52,7 +65,9 @@ function getScene() {
 }
 
 function getComponentNames(node) {
-  const components = Array.isArray(node.components) ? node.components : [];
+  const components = Array.isArray(node.components)
+    ? node.components
+    : (Array.isArray(node._components) ? node._components : []);
   return components
     .map((component) => component && component.constructor && component.constructor.name)
     .filter(Boolean);
@@ -98,6 +113,9 @@ function quatToObject(value) {
   if (!value) {
     return null;
   }
+  if (typeof value === 'number') {
+    return { angle: value };
+  }
   return { x: value.x, y: value.y, z: value.z, w: value.w };
 }
 
@@ -118,7 +136,7 @@ function summarizeNode(node, depth, maxDepth, includeComponents, includeInactive
     path: getNodePath(node),
     uuid: node.uuid,
     active: Boolean(node.active),
-    layer: node.layer,
+    layer: node.layer !== undefined ? node.layer : (node.group || node.groupIndex),
     position: vectorToObject(node.position),
     rotation: quatToObject(node.rotation),
     scale: vectorToObject(node.scale),
@@ -247,11 +265,13 @@ function findComponent(node, options = {}) {
   }
 
   if (Number.isInteger(options.index)) {
-    return node.components[options.index] || null;
+    const components = Array.isArray(node.components) ? node.components : (node._components || []);
+    return components[options.index] || null;
   }
 
   if (options.componentName) {
-    const exact = node.components.find((component) => component && component.constructor && component.constructor.name === options.componentName);
+    const components = Array.isArray(node.components) ? node.components : (node._components || []);
+    const exact = components.find((component) => component && component.constructor && component.constructor.name === options.componentName);
     if (exact) {
       return exact;
     }
@@ -283,6 +303,7 @@ function serializeEventHandler(handler) {
 }
 
 function getOrAddComponent(node, componentClass) {
+  if (!componentClass) return null;
   return node.getComponent(componentClass) || node.addComponent(componentClass);
 }
 
@@ -294,11 +315,18 @@ function configureNodeBasics(node, options = {}) {
     node.setScale(options.scale.x || 1, options.scale.y || 1, options.scale.z || 1);
   }
   if (options.eulerAngles) {
-    node.setRotationFromEuler(
-      options.eulerAngles.x || 0,
-      options.eulerAngles.y || 0,
-      options.eulerAngles.z || 0
-    );
+    const x = options.eulerAngles.x || 0;
+    const y = options.eulerAngles.y || 0;
+    const z = options.eulerAngles.z || 0;
+    if (typeof node.setRotationFromEuler === 'function') {
+      node.setRotationFromEuler(x, y, z);
+    } else if (typeof node.setRotation === 'function') {
+      if (node.is3DNode && cc.v3) {
+        node.eulerAngles = cc.v3(x, y, z);
+      } else {
+        node.angle = z;
+      }
+    }
   }
   if (typeof options.active === 'boolean') {
     node.active = options.active;
@@ -306,6 +334,15 @@ function configureNodeBasics(node, options = {}) {
 }
 
 function configureUITransform(node, options = {}) {
+  if (!UITransform) {
+    if (Number.isFinite(options.width)) node.width = options.width;
+    if (Number.isFinite(options.height)) node.height = options.height;
+    if (options.anchor) {
+      node.anchorX = options.anchor.x ?? 0.5;
+      node.anchorY = options.anchor.y ?? 0.5;
+    }
+    return null;
+  }
   const transform = getOrAddComponent(node, UITransform);
   const width = Number.isFinite(options.width) ? options.width : 160;
   const height = Number.isFinite(options.height) ? options.height : 60;
@@ -363,9 +400,9 @@ function getPrefabInfo(node) {
     fileId: prefab.fileId || '',
     asset: asset
       ? {
-          name: asset.name || '',
-          uuid: asset.uuid || asset._uuid || '',
-        }
+        name: asset.name || '',
+        uuid: asset.uuid || asset._uuid || '',
+      }
       : null,
     instance: prefab.instance ? plain(prefab.instance) : null,
     sync: prefab.sync,
@@ -399,11 +436,12 @@ function collectSceneStats() {
       if (node._prefab) stats.prefabInstanceCount += 1;
     }
 
-    for (const component of node.components || []) {
+    const components = Array.isArray(node.components) ? node.components : (node._components || []);
+    for (const component of components) {
       const name = component && component.constructor ? component.constructor.name : 'UnknownComponent';
       stats.componentCount += 1;
       stats.componentsByType[name] = (stats.componentsByType[name] || 0) + 1;
-      if (component instanceof UITransform) stats.uiTransformCount += 1;
+      if (UITransform && component instanceof UITransform) stats.uiTransformCount += 1;
       if (component instanceof Canvas) stats.canvasCount += 1;
       if (component instanceof Camera) stats.cameraCount += 1;
       if (component instanceof Label) stats.labelCount += 1;
@@ -665,7 +703,7 @@ exports.methods = {
       path: getNodePath(node),
       uuid: node.uuid,
       active: Boolean(node.active),
-      layer: node.layer,
+      layer: node.layer !== undefined ? node.layer : (node.group || node.groupIndex),
       siblingIndex: node.getSiblingIndex(),
       position: vectorToObject(node.position),
       rotation: quatToObject(node.rotation),
@@ -748,11 +786,14 @@ exports.methods = {
     }
 
     if (options.eulerAngles) {
-      node.setRotationFromEuler(
-        options.eulerAngles.x || 0,
-        options.eulerAngles.y || 0,
-        options.eulerAngles.z || 0
-      );
+      const x = options.eulerAngles.x || 0;
+      const y = options.eulerAngles.y || 0;
+      const z = options.eulerAngles.z || 0;
+      if (typeof node.setRotationFromEuler === 'function') {
+        node.setRotationFromEuler(x, y, z);
+      } else if (typeof node.setRotation === 'function') {
+        node.is3DNode ? (node.eulerAngles = cc.v3(x, y, z)) : (node.angle = z);
+      }
     }
 
     if (typeof options.active === 'boolean') {
@@ -799,11 +840,14 @@ exports.methods = {
     }
 
     if (options.eulerAngles) {
-      node.setRotationFromEuler(
-        options.eulerAngles.x || 0,
-        options.eulerAngles.y || 0,
-        options.eulerAngles.z || 0
-      );
+      const x = options.eulerAngles.x || 0;
+      const y = options.eulerAngles.y || 0;
+      const z = options.eulerAngles.z || 0;
+      if (typeof node.setRotationFromEuler === 'function') {
+        node.setRotationFromEuler(x, y, z);
+      } else if (typeof node.setRotation === 'function') {
+        node.is3DNode ? (node.eulerAngles = cc.v3(x, y, z)) : (node.angle = z);
+      }
     }
 
     if (typeof options.active === 'boolean') {
@@ -833,7 +877,7 @@ exports.methods = {
         path: getNodePath(node),
         uuid: node.uuid,
       },
-      components: node.components.map((component, index) => ({
+      components: (Array.isArray(node.components) ? node.components : (node._components || [])).map((component, index) => ({
         index,
         name: component && component.constructor ? component.constructor.name : 'UnknownComponent',
         enabled: typeof component.enabled === 'boolean' ? component.enabled : undefined,
@@ -858,7 +902,7 @@ exports.methods = {
       added: true,
       node: getNodePath(node),
       component: component.constructor ? component.constructor.name : options.componentName,
-      index: node.components.indexOf(component),
+      index: (Array.isArray(node.components) ? node.components : (node._components || [])).indexOf(component),
     };
   },
 
@@ -1009,6 +1053,8 @@ exports.methods = {
       prefab.data = root;
       const metadata = attachPrefabMetadata(root, prefab, {
         prefabUtils: Prefab._utils,
+        PrefabInfo: cc.PrefabInfo,
+        CompPrefabInfo: cc.CompPrefabInfo,
       });
       const serialized = serialize(prefab);
       const content = typeof serialized === 'string'
@@ -1090,7 +1136,19 @@ exports.methods = {
       throw new Error(`Asset '${sceneUuid}' is not a SceneAsset.`);
     }
 
-    director.runSceneImmediate(asset);
+    if (typeof director.runSceneImmediate === 'function') {
+      director.runSceneImmediate(asset);
+    } else if (typeof director.loadScene === 'function') {
+      const sceneName = asset && asset.name ? asset.name : '';
+      if (!sceneName) {
+        throw new Error('The 2.x scene asset name is unavailable.');
+      }
+      await new Promise((resolve, reject) => {
+        director.loadScene(sceneName, resolve, (error) => reject(error instanceof Error ? error : new Error(String(error))));
+      });
+    } else {
+      throw new Error('No supported scene loading API is available.');
+    }
     const scene = getScene();
     return {
       loaded: true,
@@ -1221,8 +1279,8 @@ exports.methods = {
         uuid: camera.node ? camera.node.uuid : '',
         enabled: Boolean(camera.enabled),
         priority: camera.priority,
-        projection: camera.projection,
-        visibility: camera.visibility,
+        projection: camera.projection !== undefined ? camera.projection : camera.ortho,
+        visibility: camera.visibility !== undefined ? camera.visibility : camera.cullingMask,
         clearFlags: camera.clearFlags,
       })),
     };
@@ -1266,7 +1324,7 @@ exports.methods = {
       throw new Error('Camera component was not found on target node.');
     }
 
-    for (const key of ['priority', 'visibility', 'clearFlags', 'projection', 'orthoHeight', 'fov', 'near', 'far']) {
+    for (const key of ['priority', 'depth', 'visibility', 'cullingMask', 'clearFlags', 'projection', 'ortho', 'orthoHeight', 'orthoSize', 'fov', 'near', 'nearClip', 'far', 'farClip']) {
       if (options[key] !== undefined) {
         camera[key] = options[key];
       }
@@ -1291,7 +1349,10 @@ exports.methods = {
         uuid: animation.node ? animation.node.uuid : '',
         enabled: Boolean(animation.enabled),
         defaultClip: animation.defaultClip ? animation.defaultClip.name : '',
-        clips: Array.isArray(animation.clips) ? animation.clips.map((clip) => clip && clip.name).filter(Boolean) : [],
+        clips: (typeof animation.getClips === 'function'
+          ? animation.getClips()
+          : (Array.isArray(animation.clips) ? animation.clips : [])
+        ).map((clip) => clip && clip.name).filter(Boolean),
       })),
     };
   },
@@ -1308,10 +1369,16 @@ exports.methods = {
 
     const clip = await loadAnimationClipByUuid(clipUuid);
     const animation = getOrAddComponent(node, Animation);
-    const clips = Array.isArray(animation.clips) ? animation.clips.slice() : [];
+    const clips = typeof animation.getClips === 'function'
+      ? animation.getClips().slice()
+      : (Array.isArray(animation.clips) ? animation.clips.slice() : []);
     if (!clips.includes(clip)) {
-      clips.push(clip);
-      animation.clips = clips;
+      if (typeof animation.addClip === 'function') {
+        animation.addClip(clip);
+      } else {
+        clips.push(clip);
+        animation.clips = clips;
+      }
     }
     if (options.makeDefault !== false) {
       animation.defaultClip = clip;
@@ -1322,7 +1389,10 @@ exports.methods = {
       node: getNodePath(node),
       clip: clip.name,
       clipUuid,
-      clips: animation.clips.map((item) => item && item.name).filter(Boolean),
+      clips: (typeof animation.getClips === 'function'
+        ? animation.getClips()
+        : (Array.isArray(animation.clips) ? animation.clips : [])
+      ).map((item) => item && item.name).filter(Boolean),
     };
   },
 
@@ -1380,10 +1450,10 @@ exports.methods = {
     const stats = collectSceneStats();
     const memory = typeof performance !== 'undefined' && performance.memory
       ? {
-          jsHeapSizeLimit: performance.memory.jsHeapSizeLimit,
-          totalJSHeapSize: performance.memory.totalJSHeapSize,
-          usedJSHeapSize: performance.memory.usedJSHeapSize,
-        }
+        jsHeapSizeLimit: performance.memory.jsHeapSizeLimit,
+        totalJSHeapSize: performance.memory.totalJSHeapSize,
+        usedJSHeapSize: performance.memory.usedJSHeapSize,
+      }
       : null;
 
     return {

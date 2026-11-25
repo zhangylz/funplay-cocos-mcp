@@ -36,32 +36,32 @@ For Cocos, the primary tool is `execute_javascript`:
 
 If you just want to connect quickly, do these three things:
 
-- Install this repository as a Cocos Creator extension
+- Install this repository as a Cocos Creator package
 - Open `Funplay > MCP Server`
 - Use the built-in one-click MCP client configuration
 
 ### 1. Install as a Cocos Creator Extension
 
-Recommended install: use the official [Cocos Store page](https://store.cocos.com/app/detail/8913) and install the extension into your target Cocos Creator project.
+For Cocos Creator 2.4, install this package into the project's `packages/` directory. Creator 3.x uses `extensions/`; do not use that directory with Creator 2.4.
 
 For local development or unreleased builds, clone or copy this repository into your Cocos project extension directory:
 
 ```bash
 cd /path/to/your-cocos-project
-mkdir -p extensions
-git clone https://github.com/FunplayAI/funplay-cocos-mcp.git extensions/funplay-cocos-mcp
+mkdir -p packages
+git clone https://github.com/FunplayAI/funplay-cocos-mcp.git packages/funplay-cocos-mcp
 ```
 
 Then restart Cocos Creator or reload extensions from the editor.
 
-For a non-git install, download `Funplay.CocosMcp.v<version>.zip` from the GitHub Releases page, unzip it, and move the extracted `funplay-cocos-mcp` folder into your project `extensions/` directory.
+For a non-git install, download `Funplay.CocosMcp.v<version>.zip` from the GitHub Releases page, unzip it, and move the extracted `funplay-cocos-mcp` folder into your project `packages/` directory. Confirm that `packages/funplay-cocos-mcp/scene-script.js` and `scene.js` exist beside `package.json`.
 
 #### Install for All Projects (Recommended)
 
 Install and open the extension in any project first. Then open `Funplay > MCP Settings` and click **Install for All Projects** in the All Projects section. The extension downloads the latest GitHub Release, verifies `SHA256SUMS.txt`, and installs it into the active Cocos Creator version's managed global extension directory:
 
-- macOS / Linux: `~/.CocosCreator/builtin-extensions/<Creator version>/funplay-cocos-mcp`
-- Windows: `%USERPROFILE%\.CocosCreator\builtin-extensions\<Creator version>\funplay-cocos-mcp`
+- macOS / Linux: `~/.CocosCreator/packages/funplay-cocos-mcp`
+- Windows: `%USERPROFILE%\.CocosCreator\packages\funplay-cocos-mcp`
 
 Cocos Creator scans and registers the installed copy immediately. Projects opened or created with that Creator version then load it automatically, and the MCP server keeps its default autostart behavior. Reopen an already-running project if its project-level copy has priority. No extension files are copied into each project's `extensions/` directory.
 
@@ -653,3 +653,11 @@ npm run registry:validate
 ## License
 
 MIT License. See [LICENSE](./LICENSE).
+
+## 将 插件拷贝到 指定项目
+xcopy * "E:\private\github\example-projects\packages\funplay-cocos-mcp"  /e /h /r /y
+
+## 测试 是否是最新的 Streamable HTTP MCP
+curl -X POST http://127.0.0.1:27954/ -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -H "MCP-Protocol-Version: 2025-11-25" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"clientInfo\":{\"name\":\"claude-code\",\"version\":\"0.1.0\"}}}"
+
+
